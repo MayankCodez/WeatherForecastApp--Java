@@ -1,160 +1,172 @@
 import javax.swing.*;
+import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import org.json.JSONObject;
+import java.util.*;
+import org.json.*;
 
 public class WeatherForecastApp {
     private static final String WEATHER_API_KEY = "ce904d6585a59a7dc38a0f0cfe36e2cb";
-
-    private static Color lightBg = Color.decode("#f2f6fc");
-    private static Color lightPanelBg = Color.WHITE;
-    private static Color lightText = Color.decode("#2e3c5d");
-    private static Color lightButtonBg = new Color(58, 134, 255);
-    private static Color lightButtonFg = Color.WHITE;
-
-    private static Color darkBg = Color.decode("#1e1e2f");
-    private static Color darkPanelBg = Color.decode("#2c2c3f");
-    private static Color darkText = Color.decode("#cbd5e1");
-    private static Color darkButtonBg = new Color(80, 110, 230);
-    private static Color darkButtonFg = Color.WHITE;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(WeatherForecastApp::createAndShowGUI);
     }
 
     private static void createAndShowGUI() {
-        JFrame frame = new JFrame("☀️ Weather Forecast App");
+        JFrame frame = new JFrame("Weather Forecast");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(500, 420);
+        frame.setSize(700, 550);
         frame.setLocationRelativeTo(null);
 
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setBackground(lightBg);
+        // Main panel with padding
+        JPanel mainPanel = new JPanel();
+        mainPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        mainPanel.setLayout(new BorderLayout(0, 15));
 
-        JLabel heading = new JLabel("Weather Forecast", SwingConstants.CENTER);
-        heading.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        heading.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
-        heading.setForeground(lightText);
-        mainPanel.add(heading, BorderLayout.NORTH);
+        // Header label
+        JLabel header = new JLabel("Weather Forecast", SwingConstants.CENTER);
+        header.setFont(new Font("Segoe UI", Font.BOLD, 28));
 
-        JPanel contentPanel = new JPanel();
-        contentPanel.setBackground(lightPanelBg);
-        contentPanel.setLayout(new GridBagLayout());
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 10, 8, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        mainPanel.add(header, BorderLayout.NORTH);
 
-        Font labelFont = new Font("Segoe UI", Font.PLAIN, 16);
+        // Center panel for inputs and current weather
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setOpaque(false);
 
-        JLabel cityPrompt = new JLabel("Enter City (or leave blank to auto-detect):");
-        cityPrompt.setFont(labelFont);
-        cityPrompt.setForeground(lightText);
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 2;
-        contentPanel.add(cityPrompt, gbc);
+        // Input panel
+        JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
+        inputPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 
         JTextField cityField = new JTextField();
-        cityField.setFont(labelFont);
-        gbc.gridy = 1;
-        contentPanel.add(cityField, gbc);
+        cityField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        cityField.setToolTipText("Enter city name or leave empty for auto-detection");
 
-        JButton fetchButton = new JButton("Get Weather");
-        fetchButton.setFont(labelFont);
-        fetchButton.setBackground(lightButtonBg);
-        fetchButton.setForeground(lightButtonFg);
-        fetchButton.setFocusPainted(false);
-        gbc.gridy = 2;
-        contentPanel.add(fetchButton, gbc);
+        JButton getWeatherButton = new JButton("Get Weather");
+        getWeatherButton.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        getWeatherButton.setBackground(new Color(33, 150, 243));
+        getWeatherButton.setForeground(Color.WHITE);
+        getWeatherButton.setFocusPainted(false);
+        getWeatherButton.setBorder(new RoundedBorder(10));
 
-        JLabel locationLabel = new JLabel("Location: Detecting...");
-        JLabel tempLabel = new JLabel("Temperature: ");
-        JLabel conditionLabel = new JLabel("Condition: ");
-        JLabel humidityLabel = new JLabel("Humidity: ");
-        JLabel windLabel = new JLabel("Wind Speed: ");
+        inputPanel.add(cityField, BorderLayout.CENTER);
+        inputPanel.add(getWeatherButton, BorderLayout.EAST);
 
-        JLabel[] infoLabels = {locationLabel, tempLabel, conditionLabel, humidityLabel, windLabel};
-        int row = 3;
-        for (JLabel label : infoLabels) {
-            label.setFont(labelFont);
-            label.setForeground(lightText);
-            gbc.gridy = row++;
-            contentPanel.add(label, gbc);
+        centerPanel.add(inputPanel);
+        centerPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+
+        // Current weather info panel (clean grid)
+        JPanel currentWeatherPanel = new JPanel(new GridLayout(2, 2, 15, 15));
+        currentWeatherPanel.setOpaque(false);
+
+        JLabel locationLabel = createInfoLabel("Location: ");
+        JLabel tempLabel = createInfoLabel("Temperature: ");
+        JLabel conditionLabel = createInfoLabel("Condition: ");
+        JLabel humidityLabel = createInfoLabel("Humidity: ");
+
+        currentWeatherPanel.add(locationLabel);
+        currentWeatherPanel.add(tempLabel);
+        currentWeatherPanel.add(conditionLabel);
+        currentWeatherPanel.add(humidityLabel);
+
+        centerPanel.add(currentWeatherPanel);
+        centerPanel.add(Box.createRigidArea(new Dimension(0, 25)));
+
+        // Forecast panel with cards
+        JPanel forecastPanel = new JPanel();
+        forecastPanel.setLayout(new GridLayout(1, 5, 15, 0));
+        forecastPanel.setOpaque(false);
+
+        JLabel[] forecastCards = new JLabel[5];
+        for (int i = 0; i < 5; i++) {
+            JLabel card = new JLabel("", SwingConstants.CENTER);
+            card.setVerticalTextPosition(SwingConstants.BOTTOM);
+            card.setHorizontalTextPosition(SwingConstants.CENTER);
+            card.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            card.setBorder(new RoundedBorder(15));
+            card.setOpaque(true);
+            card.setBackground(new Color(224, 242, 254));
+            card.setPreferredSize(new Dimension(110, 150));
+            forecastCards[i] = card;
+            forecastPanel.add(card);
         }
 
-        // Menu Bar with View -> Dark Mode checkbox
+        centerPanel.add(forecastPanel);
+
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+
+        // Dark Mode toggle menu
         JMenuBar menuBar = new JMenuBar();
         JMenu viewMenu = new JMenu("View");
-        JCheckBoxMenuItem darkModeMenuItem = new JCheckBoxMenuItem("Dark Mode");
-        viewMenu.add(darkModeMenuItem);
+        JCheckBoxMenuItem darkModeToggle = new JCheckBoxMenuItem("Dark Mode");
+        viewMenu.add(darkModeToggle);
         menuBar.add(viewMenu);
         frame.setJMenuBar(menuBar);
 
-        // Action listener for fetchButton
-        fetchButton.addActionListener(e -> {
+        frame.add(mainPanel);
+        frame.setVisible(true);
+
+        // Button action listener
+        getWeatherButton.addActionListener(e -> {
             String city = cityField.getText().trim();
             if (city.isEmpty()) {
                 city = detectCityByIP();
             }
             locationLabel.setText("Location: " + city);
+
             JSONObject weatherData = getWeatherData(city);
             if (weatherData != null) {
                 JSONObject main = weatherData.getJSONObject("main");
-                JSONObject wind = weatherData.getJSONObject("wind");
                 String condition = weatherData.getJSONArray("weather").getJSONObject(0).getString("description");
-                tempLabel.setText("Temperature: " + main.getDouble("temp") + " \u00B0C");
+                tempLabel.setText(String.format("Temperature: %.1f °C", main.getDouble("temp")));
                 conditionLabel.setText("Condition: " + capitalize(condition));
                 humidityLabel.setText("Humidity: " + main.getInt("humidity") + "%");
-                windLabel.setText("Wind Speed: " + wind.getDouble("speed") + " m/s");
             } else {
                 JOptionPane.showMessageDialog(frame, "Could not retrieve weather data.", "Error", JOptionPane.ERROR_MESSAGE);
             }
-        });
 
-        // Dark mode toggle from menu item
-        darkModeMenuItem.addActionListener(e -> {
-            boolean darkMode = darkModeMenuItem.isSelected();
-            if (darkMode) {
-                mainPanel.setBackground(darkBg);
-                contentPanel.setBackground(darkPanelBg);
-                heading.setForeground(darkText);
-                cityPrompt.setForeground(darkText);
-                for (JLabel label : infoLabels) {
-                    label.setForeground(darkText);
-                }
-                cityField.setBackground(darkPanelBg);
-                cityField.setForeground(darkText);
-                fetchButton.setBackground(darkButtonBg);
-                fetchButton.setForeground(darkButtonFg);
-                // Menu item colors
-                viewMenu.setForeground(darkText);
-                darkModeMenuItem.setBackground(darkPanelBg);
-                darkModeMenuItem.setForeground(darkText);
-            } else {
-                mainPanel.setBackground(lightBg);
-                contentPanel.setBackground(lightPanelBg);
-                heading.setForeground(lightText);
-                cityPrompt.setForeground(lightText);
-                for (JLabel label : infoLabels) {
-                    label.setForeground(lightText);
-                }
-                cityField.setBackground(Color.WHITE);
-                cityField.setForeground(Color.BLACK);
-                fetchButton.setBackground(lightButtonBg);
-                fetchButton.setForeground(lightButtonFg);
-                // Menu item colors
-                viewMenu.setForeground(Color.BLACK);
-                darkModeMenuItem.setBackground(null);
-                darkModeMenuItem.setForeground(null);
+            JSONObject forecastData = getFiveDayForecast(city);
+            if (forecastData != null) {
+                updateForecastCards(forecastData, forecastCards);
             }
         });
 
-        mainPanel.add(contentPanel, BorderLayout.CENTER);
-        frame.setContentPane(mainPanel);
-        frame.setVisible(true);
+        // Dark mode toggle
+        darkModeToggle.addActionListener(e -> {
+            boolean dark = darkModeToggle.isSelected();
+            Color bg = dark ? new Color(30, 30, 30) : Color.WHITE;
+            Color fg = dark ? Color.WHITE : Color.DARK_GRAY;
+            Color cardBg = dark ? new Color(60, 63, 65) : new Color(224, 242, 254);
+
+            mainPanel.setBackground(bg);
+            centerPanel.setBackground(bg);
+            currentWeatherPanel.setBackground(bg);
+            forecastPanel.setBackground(bg);
+            for (JLabel card : forecastCards) {
+                card.setBackground(cardBg);
+                card.setForeground(fg);
+                card.setBorder(new RoundedBorder(15, dark ? new Color(100, 100, 100) : new Color(200, 200, 200)));
+            }
+
+            locationLabel.setForeground(fg);
+            tempLabel.setForeground(fg);
+            conditionLabel.setForeground(fg);
+            humidityLabel.setForeground(fg);
+            header.setForeground(dark ? Color.CYAN : new Color(33, 150, 243));
+            cityField.setBackground(dark ? new Color(80, 80, 80) : Color.WHITE);
+            cityField.setForeground(fg);
+            getWeatherButton.setBackground(dark ? new Color(70, 130, 180) : new Color(33, 150, 243));
+            getWeatherButton.setForeground(Color.WHITE);
+        });
+    }
+
+    private static JLabel createInfoLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        label.setForeground(Color.DARK_GRAY);
+        return label;
     }
 
     private static String detectCityByIP() {
@@ -162,15 +174,11 @@ public class WeatherForecastApp {
             URL url = new URL("http://ip-api.com/json");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String inputLine;
             StringBuilder content = new StringBuilder();
-            while ((inputLine = in.readLine()) != null) {
-                content.append(inputLine);
-            }
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) content.append(inputLine);
             in.close();
-
             JSONObject response = new JSONObject(content.toString());
             return response.getString("city");
         } catch (Exception e) {
@@ -187,15 +195,11 @@ public class WeatherForecastApp {
             URL url = new URL(urlString);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-
             BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String inputLine;
             StringBuilder content = new StringBuilder();
-            while ((inputLine = in.readLine()) != null) {
-                content.append(inputLine);
-            }
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) content.append(inputLine);
             in.close();
-
             return new JSONObject(content.toString());
         } catch (Exception e) {
             e.printStackTrace();
@@ -203,8 +207,101 @@ public class WeatherForecastApp {
         }
     }
 
+    private static JSONObject getFiveDayForecast(String city) {
+        try {
+            String urlString = String.format(
+                    "https://api.openweathermap.org/data/2.5/forecast?q=%s&units=metric&appid=%s",
+                    URLEncoder.encode(city, "UTF-8"), WEATHER_API_KEY);
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder content = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) content.append(inputLine);
+            in.close();
+            return new JSONObject(content.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static void updateForecastCards(JSONObject forecastData, JLabel[] cards) {
+        try {
+            JSONArray list = forecastData.getJSONArray("list");
+            Map<String, Double> tempSum = new LinkedHashMap<>();
+            Map<String, Integer> count = new LinkedHashMap<>();
+            Map<String, String> conditions = new LinkedHashMap<>();
+
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject entry = list.getJSONObject(i);
+                String dt_txt = entry.getString("dt_txt");
+                String day = dt_txt.split(" ")[0];
+
+                double temp = entry.getJSONObject("main").getDouble("temp");
+                String condition = entry.getJSONArray("weather").getJSONObject(0).getString("main");
+
+                tempSum.put(day, tempSum.getOrDefault(day, 0.0) + temp);
+                count.put(day, count.getOrDefault(day, 0) + 1);
+                if (!conditions.containsKey(day)) {
+                    conditions.put(day, condition);
+                }
+            }
+
+            int i = 0;
+            for (String day : tempSum.keySet()) {
+                if (i >= 5) break;
+                double avgTemp = tempSum.get(day) / count.get(day);
+                String cond = conditions.get(day);
+                String dateDisplay = day.substring(5); // MM-DD
+                cards[i].setText("<html><b>" + dateDisplay + "</b><br>" +
+                        String.format("%.1f", avgTemp) + " °C<br>" +
+                        cond + "</html>");
+                i++;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private static String capitalize(String text) {
         if (text == null || text.isEmpty()) return text;
-        return text.substring(0, 1).toUpperCase() + text.substring(1);
+        return Character.toUpperCase(text.charAt(0)) + text.substring(1);
+    }
+
+    // Custom rounded border for buttons and cards
+    static class RoundedBorder extends AbstractBorder {
+        private final int radius;
+        private final Color borderColor;
+
+        public RoundedBorder(int radius) {
+            this(radius, Color.LIGHT_GRAY);
+        }
+
+        public RoundedBorder(int radius, Color borderColor) {
+            this.radius = radius;
+            this.borderColor = borderColor;
+        }
+
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setColor(borderColor);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(radius / 2, radius / 2, radius / 2, radius / 2);
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c, Insets insets) {
+            insets.left = insets.top = insets.right = insets.bottom = radius / 2;
+            return insets;
+        }
     }
 }
